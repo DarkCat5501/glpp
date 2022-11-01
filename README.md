@@ -52,12 +52,10 @@ shader_program.bind(); //should be bound before setting uniform data
 
 bool matrix_transposed = false
 view_loc.set_data(&view_matrix,1,matrix_transposed);
+//glm: view_loc.set_data(value_ptr(view_matrix), 1,matrix_transposed);
 
 //loading uniform array: entity_transforms -> std::vector<matrix4x4>
 model_loc.set_data(entity_transforms.data(),entity_transforms.size(),matrix_transposed);
-
-
-//glm: view_loc.set_data(value_ptr(view_matrix), 1,matrix_transposed);
 
 shader_program.unbind();
 
