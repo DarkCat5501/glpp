@@ -109,7 +109,7 @@ struct ShaderUniform {
 
 	template<typename T, typename... Args>
 	void set_data(const std::vector<T,Args...>& data, bool transposed = false){
-		set_data(data.data(),data.size(),transposed);
+		set_data((void*)data.data(),data.size(),transposed);
 	};
 
 	template<typename T, typename... Args>
