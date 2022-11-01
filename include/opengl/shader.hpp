@@ -1,5 +1,5 @@
 #pragma once
-#include <opengl/core.hpp>
+#include "core.hpp"
 
 enum class ShaderType: uint32_t {
 	None,
@@ -40,7 +40,6 @@ enum class UniformType: uint8_t {
 	MaxType
 };
 
-
 struct ShaderUniform {
 	UniformType type = UniformType::None;
 	uint32_t id = 0;
@@ -48,79 +47,80 @@ struct ShaderUniform {
 	void set_data(void* data,size_t count, bool transpose = false){
 		switch(type){
 			case UniformType::Int:
-				glUniform1iv(id,count,data);
+				SAFE_CALL( ShaderUniform1iv, glUniform1iv(id,count,(int32_t*)data) );
 				break;
 			case UniformType::Float:
-				glUniform1fv(id,count,data);
+				SAFE_CALL( ShaderUniform1fv, glUniform1fv(id,count,(float*)data) );
 				break;
 			case UniformType::Double:
-				glUniform1dv(id,count,data);
+				SAFE_CALL( ShaderUniform1dv, glUniform1dv(id,count,(double*)data) );
 				break;
 			case UniformType::IVec2:
-				glUniform2iv(id,count,data);
+				SAFE_CALL( ShaderUniform2iv, glUniform2iv(id,count,(int32_t*)data) );
 				break;
 			case UniformType::IVec3:
-				glUniform3iv(id,count,data);
+				SAFE_CALL( ShaderUniform3iv, glUniform3iv(id,count,(int32_t*)data) );
 				break;
 			case UniformType::IVec4:
-				glUniform4iv(id,count,data);
+				SAFE_CALL( ShaderUniform4iv, glUniform4iv(id,count,(int32_t*)data) );
 				break;
 			case UniformType::FVec2:
-				glUniform2fv(id,count,data);
+				SAFE_CALL( ShaderUniform2fv, glUniform2fv(id,count,(float*)data) );
 				break;
 			case UniformType::FVec3:
-				glUniform3fv(id,count,data);
+				SAFE_CALL( ShaderUniform3fv, glUniform3fv(id,count,(float*)data) );
 				break;
 			case UniformType::FVec4:
-				glUniform4fv(id,count,data);
+				SAFE_CALL( ShaderUniform4fv, glUniform4fv(id,count,(float*)data) );
 				break;
 			case UniformType::DVec2:
-				glUniform2dv(id,count,data);
+				SAFE_CALL( ShaderUniform2dv, glUniform2dv(id,count,(double*)data) );
 				break;
 			case UniformType::DVec3:
-				glUniform3dv(id,count,data);
+				SAFE_CALL( ShaderUniform3dv, glUniform3dv(id,count,(double*)data) );
 				break;
 			case UniformType::DVec4:
-				glUniform4dv(id,count,data);
+				SAFE_CALL( ShaderUniform4dv, glUniform4dv(id,count,(double*)data) );
 				break;
 			case UniformType::FMat2:
-				glUniformMatrix2fv(id,count, transpose ? GL_TRUE:GL_FALSE ,data);
+				SAFE_CALL( ShaderUniformMatrix2fv, glUniformMatrix2fv(id,count, transpose ? GL_TRUE:GL_FALSE ,(float*)data) );
 				break;
 			case UniformType::FMat3:
-				glUniformMatrix3fv(id,count, transpose ? GL_TRUE:GL_FALSE ,data);
+				SAFE_CALL( ShaderUniformMatrix3fv, glUniformMatrix3fv(id,count, transpose ? GL_TRUE:GL_FALSE ,(float*)data) );
 				break;
 			case UniformType::FMat4:
-				glUniformMatrix4fv(id,count, transpose ? GL_TRUE:GL_FALSE ,data);
+				SAFE_CALL( ShaderUniformMatrix4fv, glUniformMatrix4fv(id,count, transpose ? GL_TRUE:GL_FALSE ,(float*)data) );
 				break;
 			case UniformType::DMat2:
-				glUniformMatrix2dv(id,count, transpose ? GL_TRUE:GL_FALSE ,data);
+				SAFE_CALL( ShaderUniformMatrix2dv, glUniformMatrix2dv(id,count, transpose ? GL_TRUE:GL_FALSE ,(double*)data) );
 				break;
 			case UniformType::DMat3:
-				glUniformMatrix3dv(id,count, transpose ? GL_TRUE:GL_FALSE ,data);
+				SAFE_CALL( ShaderUniformMatrix3dv, glUniformMatrix3dv(id,count, transpose ? GL_TRUE:GL_FALSE ,(double*)data) );
 				break;
 			case UniformType::DMat4:
-				glUniformMatrix4dv(id,count, transpose ? GL_TRUE:GL_FALSE ,data);
+				SAFE_CALL( ShaderUniformMatrix4dv, glUniformMatrix4dv(id,count, transpose ? GL_TRUE:GL_FALSE ,(double*)data) );
 				break;
 			default:break;
 		}
 	}
 };
 
-
 class ShaderInstance: public Instance {
 	public:
 		ShaderInstance() = delete;
 		ShaderInstance(ShaderType type):Instance(InstanceType::Shader),m_type(type){
-			*id_ref() = glCreateShader((uint32_t)m_type);
+			SAFE_CALL( ShaderCreate, *id_ref() = glCreateShader((uint32_t)m_type));
 		}
 
 		~ShaderInstance(){
-			if(need_destroy()) glDeleteShader(id());
+			if(need_destroy()){
+				SAFE_CALL( ShaderDelete, glDeleteShader(id()) );
+			}
 		}
 
 		bool source(const char* source, size_t sz){
 			size_t sz2 = sz;
-			glShaderSource(id(),1,&source, (int  *)&sz2);
+			SAFE_CALL( ShaderBytesSource, glShaderSource(id(),1,&source, (int  *)&sz2) );
 			if(g_utils::has_error(&m_last_error)){
 				std::cout<<"Error on source:"<< glewGetErrorString(m_last_error)<<"\n";
 			};
@@ -131,12 +131,12 @@ class ShaderInstance: public Instance {
 		bool operator<<(const std::string& source){
 			const char* data = source.data();
 			size_t sz = source.size();
-			glShaderSource(id(),1,&data,(int *)&sz);
+			SAFE_CALL( ShaderStringSource, glShaderSource(id(),1,&data,(int *)&sz) );
 			return !g_utils::has_error(&m_last_error);
 		}
 
 		bool operator<<(std::ifstream& file){
-			#ifdef DEBUG
+			#ifdef GL_DEBUG
 			//ensure fstream can throw exceptions
 			file.exceptions (std::ifstream::failbit | std::ifstream::badbit);
 			if(!file.is_open())
@@ -151,23 +151,23 @@ class ShaderInstance: public Instance {
 
 			file.read(buffer.data(),length);
 			const char* data = buffer.data();
-			glShaderSource(id(),1,&data, (int *)&length);
+			SAFE_CALL( ShaderFileSource, glShaderSource(id(),1,&data, (int *)&length) );
 		}
 
 		bool compile(){
-			glCompileShader(id());
+			SAFE_CALL( ShaderCompile, glCompileShader(id()) );
 			return !g_utils::has_error(&m_last_error);
 		}
 
 		bool check_compile_status(){
 			int success;
-			glGetShaderiv(id(),GL_COMPILE_STATUS,&success);
+			SAFE_CALL(ShaderCompileCheck, glGetShaderiv(id(),GL_COMPILE_STATUS,&success) );
 			char info[512];
 			int length = 0;
 			if(!success){
-				glGetShaderInfoLog(id(),512, &length, info);
+				SAFE_CALL( ShaderInfoLog, glGetShaderInfoLog(id(),512, &length, info));
 				s_last_error = std::string(info, length);
-				#ifdef DEBUG
+				#ifdef GL_DEBUG
 				LOG_ERROR(Shader, "type:[" << (int)m_type << "]:" << info );
 				#endif
 			}
@@ -188,15 +188,16 @@ class ShaderInstance: public Instance {
 		virtual void t_unbind(){}
 };
 
-
 class ShaderProgramInstance: public Instance {
 	public:
 		ShaderProgramInstance():Instance(InstanceType::ShaderProgram){ 
-			*id_ref() = glCreateProgram();
+			SAFE_CALL( ShaderProgramCreate, *id_ref() = glCreateProgram() );
 		}
 
 		~ShaderProgramInstance(){
-			if(need_destroy())glDeleteProgram(id());
+			if(need_destroy()){
+				SAFE_CALL( ShaderProgramDelete, glDeleteProgram(id()) );
+			}
 		}
 
 		bool attach(const ShaderInstance& shader){
@@ -205,13 +206,13 @@ class ShaderProgramInstance: public Instance {
 		}
 
 		bool operator<<(const ShaderInstance& shader){
-			SAFE_CALL( ShaderAttach, glAttachShader(id(),shader.id()));
+			glAttachShader(id(),shader.id());
 			return !g_utils::has_error(&m_last_error);
 		}
 
-		bool operator<<(const std::vector<std::shared_ptr<Instance>> shaders){
+		bool operator<<(const std::vector<ShaderInstance>& shaders){
 			for(auto &shader: shaders){
-				glAttachShader(id(),shader->id());
+				glAttachShader(id(),shader.id());
 				if( g_utils::has_error(&m_last_error) )return false;
 			}
 			return true;
@@ -224,13 +225,13 @@ class ShaderProgramInstance: public Instance {
 
 		bool check_link_status(){
 			int success;
-			glGetProgramiv(id(),GL_LINK_STATUS,&success);
+			SAFE_CALL( ShaderProgramCheck, glGetProgramiv(id(),GL_LINK_STATUS,&success) );
 			char info[512];
 			int length = 0;
 			if(!success){
-				glGetProgramInfoLog(id(),512, &length, info);
+				SAFE_CALL( ShaderProgramInfoLog, glGetProgramInfoLog(id(),512, &length, info) );
 				s_last_error = std::string(info, length);
-				#ifdef DEBUG
+				#ifdef GL_DEBUG
 				LOG_ERROR(Program,info);
 				#endif
 			}
@@ -238,7 +239,8 @@ class ShaderProgramInstance: public Instance {
 		}
 
 		ShaderUniform get_uniform(const std::string& name, UniformType type){
-			uint32_t location = glGetUniformLocation(id(),name.c_str());
+			uint32_t location = 0;
+			SAFE_CALL( ShaderProgramUniformLocation, location = glGetUniformLocation(id(),name.c_str()) );
 			return {
 				.type = type,
 				.id = location
@@ -254,9 +256,9 @@ class ShaderProgramInstance: public Instance {
 		std::string s_last_error;
 
 		void t_bind() override {
-			glUseProgram(id());
+			SAFE_CALL( ShaderProgramBind, glUseProgram(id()) );
 		}
 		void t_unbind() override {
-			glUseProgram(0);
+			SAFE_CALL( ShaderProgramUnbind, glUseProgram(0) );
 		}
 };

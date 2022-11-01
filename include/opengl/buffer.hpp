@@ -1,5 +1,5 @@
 #pragma once
-#include <opengl/core.hpp>
+#include "core.hpp"
 
 enum class BufferTarget: uint32_t{
 	None,
@@ -40,7 +40,7 @@ struct BufferDescriptor{
 };
 
 std::ostream& operator<<(std::ostream &stream, BufferDescriptor desc) {
-    	return stream << "{ target: " << std::hex<<(uint32_t)desc.target<<", access: "<<std::hex<<(uint32_t)desc.access<<", usage: "<<std::hex<<(uint32_t)desc.usage<<" }";
+	return stream << "{ target: " << std::hex<<(uint32_t)desc.target<<", access: "<<std::hex<<(uint32_t)desc.access<<", usage: "<<std::hex<<(uint32_t)desc.usage<<" }";
 }
 
 
@@ -107,7 +107,6 @@ class VertexArrayInstance: public Instance{
 
 class BufferArray: public InstanceArray<BufferInstance>{
 	public:
-		BufferArray() = default;
 		BufferArray(size_t sz):InstanceArray<BufferInstance>(sz){
 			p_descriptors = new BufferDescriptor[sz];	
 			for (size_t i = 0; i < sz; i++) p_descriptors[i] = {
@@ -116,11 +115,12 @@ class BufferArray: public InstanceArray<BufferInstance>{
 				.access=BufferAccess::None
 			};
 
-			glGenBuffers(size(),ids_ref());
+			SAFE_CALL( BufferGenArray ,glGenBuffers(size(),ids_ref()) );
 		}
 
 		~BufferArray(){
-			glDeleteBuffers(size(), ids_ref());
+			SAFE_CALL( BufferDeleteArray, glDeleteBuffers(size(), ids_ref()) );
+			delete[] p_descriptors;
 		}
 
 		void set_descriptor(size_t index, const BufferDescriptor& desc){
@@ -130,7 +130,7 @@ class BufferArray: public InstanceArray<BufferInstance>{
 
 	private:
 	protected:
-		BufferDescriptor* p_descriptors;
+		BufferDescriptor* p_descriptors = nullptr;
 
 		virtual BufferInstance instance_at(uint32_t* pId, size_t index){
 			return BufferInstance(p_descriptors[index], pId);
@@ -140,13 +140,12 @@ class BufferArray: public InstanceArray<BufferInstance>{
 
 class VertexArrays: public InstanceArray<VertexArrayInstance>{
 	public:
-		VertexArrays() = delete;
 		VertexArrays(size_t sz):InstanceArray<VertexArrayInstance>(sz){
-			glGenVertexArrays(size(),ids_ref());
+			SAFE_CALL( VertexArraysGen,  glGenVertexArrays(size(),ids_ref()) );
 		}
 
 		~VertexArrays(){
-			glDeleteVertexArrays(size(), ids_ref());
+			SAFE_CALL( VertexArraysDelete , glDeleteVertexArrays(size(), ids_ref()) );
 		}
 
 	private:
