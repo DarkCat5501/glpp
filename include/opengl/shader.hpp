@@ -106,6 +106,16 @@ struct ShaderUniform {
 			default:break;
 		}
 	}
+
+	template<typename T, typename... Args>
+	void set_data(const std::vector<T,Args...>& data, bool transposed = false){
+		set_data(data.data(),data.size(),transposed);
+	};
+
+	template<typename T, typename... Args>
+	void operator<<(const std::vector<T,Args...>& container){
+		set_data(container,false);
+	}
 };
 
 class ShaderInstance: public Instance {
