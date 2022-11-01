@@ -46,6 +46,9 @@ struct ShaderUniform {
 
 	void set_data(void* data,size_t count, bool transpose = false){
 		switch(type){
+			case UniformType::None:
+				LOG_ERROR( ShaderUniformNone, "No uniform type was provided");
+				break;
 			case UniformType::Int:
 				SAFE_CALL( ShaderUniform1iv, glUniform1iv(id,count,(int32_t*)data) );
 				break;
@@ -238,7 +241,7 @@ class ShaderProgramInstance: public Instance {
 			return success;
 		}
 
-		ShaderUniform get_uniform(const std::string& name, UniformType type){
+		ShaderUniform get_uniform(const std::string& name, UniformType type = UniformType::None){
 			uint32_t location = 0;
 			SAFE_CALL( ShaderProgramUniformLocation, location = glGetUniformLocation(id(),name.c_str()) );
 			return {
