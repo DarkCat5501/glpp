@@ -55,7 +55,12 @@ view_loc.set_data(&view_matrix,1,matrix_transposed);
 //glm: view_loc.set_data(value_ptr(view_matrix), 1,matrix_transposed);
 
 //loading uniform array: entity_transforms -> std::vector<matrix4x4>
-model_loc.set_data(entity_transforms.data(),entity_transforms.size(),matrix_transposed);
+model_loc.set_data(entity_transforms,matrix_transposed);
+
+//or in case of non transposed matrices
+model_loc << entity_transforms;
+
+//note that matrix_transposed is only meant for matrix uniform types and doesn't really affect any other data type
 
 shader_program.unbind();
 
