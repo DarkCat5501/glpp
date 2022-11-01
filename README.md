@@ -34,12 +34,14 @@ ShaderProgramInstance shader_program;
 
 ### Getting Uniforms
 ```cpp
-	//for uniform creation the uniform type must be provided for latter use
 	ShaderUniform view_loc  = shader_program.get_uniform("View"      ,UniformType::FMat4 );
     ShaderUniform model_loc = shader_program.get_uniform("Models"    ,UniformType::FMat4 );
     ShaderUniform cam_loc   = shader_program.get_uniform("Cam"       ,UniformType::FMat4 );
     ShaderUniform color_loc = shader_program.get_uniform("Color"     ,UniformType::FVec3 );
-    ShaderUniform max_index = shader_program.get_uniform("max_index" ,UniformType::Int   );
+    ShaderUniform max_index = shader_program.get_uniform("max_index");
+
+	max_index.type = UniformType::Int;
+	//note that uniform type must be set or latter set_data function won't work
 ```
 
 ### Setting Uniform data
