@@ -6,6 +6,7 @@ enum class BufferTarget: uint32_t{
 	Array = GL_ARRAY_BUFFER,
 	Element = GL_ELEMENT_ARRAY_BUFFER,
 	Uniform = GL_UNIFORM_BUFFER,
+	ShaderStorage = GL_SHADER_STORAGE_BUFFER,
 	Max
 };
 
@@ -19,10 +20,18 @@ enum class BufferAccess: uint32_t{
 
 enum class BufferUsage: uint32_t{
 	None,
+	StreamDraw = GL_STREAM_DRAW,
+	StreamRead = GL_STREAM_READ,
+	StreamCopy = GL_STREAM_COPY,
+
 	StaticDraw = GL_STATIC_DRAW,
 	StaticRead = GL_STATIC_READ,
+	StaticCopy = GL_STATIC_COPY,
+
 	DynamicDraw = GL_DYNAMIC_DRAW,
 	DynamicRead = GL_DYNAMIC_READ,
+	DynamicCopy = GL_DYNAMIC_COPY,
+
 	Max
 };
 
@@ -53,14 +62,57 @@ class BufferInstance: public Instance{
 
 		~BufferInstance(){
 			if(need_destroy()){
-				SAFE_CALL( DeleteBuffer, glDeleteBuffers(1,id_ref()) );
+				glDeleteBuffers(1,id_ref());
 			}
 		}
 
 		template<typename T, typename... Args>
 		void operator<<(const std::vector<T,Args...>& container){
-			bind();
-			SAFE_CALL(BufferData, glBufferData((uint32_t)m_descriptor.target,sizeof(T)*container.size(),container.data(),(uint32_t)m_descriptor.usage) );
+			#ifdef GL_LATEST_FEATURES
+				SAFE_CALL(BufferData, glNameBufferData(id(),sizeof(T)*container.size(),(void*)container.data(),(uint32_t)m_descriptor.usage) );
+			#else
+				bind();
+				SAFE_CALL(BufferData, glBufferData((uint32_t)m_descriptor.target,sizeof(T)*container.size(),(void*)container.data(),(uint32_t)m_descriptor.usage) );
+			#endif
+			
+		}
+
+		void storage(size_t sz_bytes){
+			#ifdef GL_LATEST_FEATURES
+				SAFE_CALL(BufferStorage, glNameBufferData(id(),sz_bytes,nullptr,(uint32_t)m_descriptor.usage) );
+			#else
+				bind();
+				SAFE_CALL(BufferStorage, glBufferData((uint32_t)m_descriptor.target,sz_bytes,nullptr,(uint32_t)m_descriptor.usage) );
+			#endif
+		}
+
+		void sub_data(void* data, size_t sz, std::ptrdiff_t offset){
+			#ifdef GL_LATEST_FEATURES
+				SAFE_CALL( BufferSubData, glNamedBufferSubData(id(),offset,sz,data); );
+			#else
+				bind();
+				SAFE_CALL( BufferSubData, glBufferSubData((uint32_t)m_descriptor.target,offset,sz,data) );
+			#endif
+		}
+
+		const void * map_memory(BufferAccess access){
+			void* data = nullptr;
+			#ifdef GL_LATEST_FEATURES
+				SAFE_CALL(BufferMapMemory,  data = glMapNamedBuffer(id(),(uint32_t)access) );
+			#else
+				bind();
+				SAFE_CALL(BufferMapMemory,  data = glMapBuffer((uint32_t)m_descriptor.target, (uint32_t)access) );
+			#endif
+			return data;
+		}
+
+		void unmap_memory(){
+			#ifdef GL_LATEST_FEATURES
+				SAFE_CALL( BufferUnmapMemory, glUnmapNamedBuffer(id()) );
+			#else
+				bind();
+				SAFE_CALL( BufferUnmapMemory, glUnmapBuffer((uint32_t)m_descriptor.target) );
+			#endif			
 		}
 
 	private:
@@ -82,6 +134,20 @@ class BufferInstance: public Instance{
 		}
 };
 
+//@TODO: add a simple way to stream data in and out of the buffer
+// class BufferStream {
+// 	public:
+// 		bool garante_all_access_rights = false;
+// 		BufferStream():m_access(BufferAccess::WRITE_ONLY){}
+// 		BufferStream(BufferAccess access):m_access(access){}
+// 		BufferStream operator<<(){
+// 		}
+// 		BufferStream operator>>(){
+// 		}
+// 	protected:
+// 		BufferAccess m_access;
+// };
+
 class VertexArrayInstance: public Instance{
 	public:
 		VertexArrayInstance():Instance(InstanceType::VertexArray){
@@ -91,7 +157,7 @@ class VertexArrayInstance: public Instance{
 
 		~VertexArrayInstance(){
 			if(need_destroy()){
-				SAFE_CALL( VertexArray , glDeleteVertexArrays(1,id_ref()) );
+				glDeleteVertexArrays(1,id_ref());
 			}
 		}
 
@@ -119,7 +185,7 @@ class BufferArray: public InstanceArray<BufferInstance>{
 		}
 
 		~BufferArray(){
-			SAFE_CALL( BufferDeleteArray, glDeleteBuffers(size(), ids_ref()) );
+			glDeleteBuffers(size(), ids_ref());
 			delete[] p_descriptors;
 		}
 
@@ -145,7 +211,7 @@ class VertexArrays: public InstanceArray<VertexArrayInstance>{
 		}
 
 		~VertexArrays(){
-			SAFE_CALL( VertexArraysDelete , glDeleteVertexArrays(size(), ids_ref()) );
+			glDeleteVertexArrays(size(), ids_ref());
 		}
 
 	private:

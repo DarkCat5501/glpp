@@ -102,3 +102,80 @@ VBO.unbind();
 VAO.unbind();
 EBO.unbind(); //EBO should be unbound after VertexArray (openGL stuff)
 ```
+
+
+### Texture Loading
+
+for this example assume that the image loading function is something like this:
+```cpp
+struct Image{
+    int width=0,height=0,channels = 3;
+    stbi_uc* data = nullptr;
+
+    Image(){}
+
+    ~Image(){
+        if(data) stbi_image_free(data);
+    }
+
+    /**
+     * loads an image and its data
+     * @param file the name of the file
+     * @param channels ? the amount of channels wanted
+    */
+    static Image load(const char* file,int channels = 4){
+        Image image;
+        image.data = stbi_load(file,&image.width,&image.height,&image.channels,channels);
+        return image;
+    }
+};
+```
+
+now loading a texture is easy,
+first, create a ```TextureInstance``` and provide it the type of texture wanted for example:
+* __Tex1D__ for color arrays
+* __Tex1DArray__ for and array of color arrays
+* __Tex2D__ for images
+* __Tex2DArray__ for image arrays
+* __Tex3D__ for 3D images (perhaps voxel data)
+
+Texture Instance Creation:
+```cpp
+    TextureInstance texture(TextureType::Tex2D);
+```
+setting up the filters (min_filter and mag_filter):
+```cpp
+    texture.setup({
+		.iparams = { 
+			TextureConfig::IOption{ GL_TEXTURE_WRAP_S, { GL_REPEAT } },
+			TextureConfig::IOption{ GL_TEXTURE_WRAP_T, { GL_REPEAT } } ,
+			TextureConfig::IOption{ GL_TEXTURE_MIN_FILTER, { GL_NEAREST } } ,
+			TextureConfig::IOption{ GL_TEXTURE_MAG_FILTER, { GL_LINEAR } } 
+		},
+		//and if you want to also setup the border color
+		// .fparams = {
+		// 	TextureConfig::FOption{ GL_TEXTURE_BORDER_COLOR, { 1.0f,1.0f,1.0f,1.0f } },
+		// }
+    });
+```
+and finaly load the image into the texture:
+
+```cpp
+	texture.source(TextureSpec{
+		.width = (size_t)test_image.width,
+		.height = (size_t)test_image.height,
+		.depth = 0, //or layer in case you're dealing with Tex1DArray ou Tex2DArray
+		.border = 0,
+		.level = 0,
+		.internal_format = GL_RGB; //the format that will be used by GPU
+		.format = GL_RGB, //the format of the data you're loading
+		.datatype = GL_UNSIGNED_BYTE;
+		.generate_mipmaps = false; //force openGL to generate MipMaps for your texture
+	}, test_image.data);
+``` 
+
+__note__ that all the texture related functions above already deal with texture binding and at this point to prevent any changes 
+on the GPU data you should unbind it:
+```cpp
+texture.unbind();
+```

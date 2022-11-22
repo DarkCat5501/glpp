@@ -40,6 +40,8 @@ enum class UniformType: uint8_t {
 	MaxType
 };
 
+//TODO: ShaderError structure
+
 struct ShaderUniform {
 	UniformType type = UniformType::None;
 	uint32_t id = 0;
@@ -122,18 +124,18 @@ class ShaderInstance: public Instance {
 	public:
 		ShaderInstance() = delete;
 		ShaderInstance(ShaderType type):Instance(InstanceType::Shader),m_type(type){
-			SAFE_CALL( ShaderCreate, *id_ref() = glCreateShader((uint32_t)m_type));
+			THIS_INSTANCE_CALL( InstanceErrorType::Create, *id_ref() = glCreateShader((uint32_t)m_type));
 		}
 
 		~ShaderInstance(){
 			if(need_destroy()){
-				SAFE_CALL( ShaderDelete, glDeleteShader(id()) );
+				THIS_INSTANCE_CALL( InstanceErrorType::Destroy, glDeleteShader(id()) );
 			}
 		}
 
 		bool source(const char* source, size_t sz){
 			size_t sz2 = sz;
-			SAFE_CALL( ShaderBytesSource, glShaderSource(id(),1,&source, (int  *)&sz2) );
+			THIS_INSTANCE_CALL( InstanceErrorType::Source, glShaderSource(id(),1,&source, (int  *)&sz2) );
 			if(g_utils::has_error(&m_last_error)){
 				std::cout<<"Error on source:"<< glewGetErrorString(m_last_error)<<"\n";
 			};
@@ -141,44 +143,37 @@ class ShaderInstance: public Instance {
 			return !g_utils::is_error(m_last_error);
 		}
 
-		bool operator<<(const std::string& source){
-			const char* data = source.data();
-			size_t sz = source.size();
-			SAFE_CALL( ShaderStringSource, glShaderSource(id(),1,&data,(int *)&sz) );
-			return !g_utils::has_error(&m_last_error);
+		bool operator<<(const std::string& data){
+			return source(data.data(),data.size());
 		}
 
 		bool operator<<(std::ifstream& file){
-			#ifdef GL_DEBUG
 			//ensure fstream can throw exceptions
 			file.exceptions (std::ifstream::failbit | std::ifstream::badbit);
 			if(!file.is_open())
 				throw std::invalid_argument("file to read is not a valid stream, must be open!");
-			#endif
-
+		
 			file.seekg(0,std::ios::end);
 			size_t length = file.tellg();
 			file.seekg(0,std::ios::beg);
-
 			std::vector<char> buffer(length);
-
 			file.read(buffer.data(),length);
-			const char* data = buffer.data();
-			SAFE_CALL( ShaderFileSource, glShaderSource(id(),1,&data, (int *)&length) );
+
+			return source(buffer.data(), buffer.size());
 		}
 
 		bool compile(){
-			SAFE_CALL( ShaderCompile, glCompileShader(id()) );
+			THIS_INSTANCE_CALL( InstanceErrorType::Compile, glCompileShader(id()) );
 			return !g_utils::has_error(&m_last_error);
 		}
 
 		bool check_compile_status(){
 			int success;
-			SAFE_CALL(ShaderCompileCheck, glGetShaderiv(id(),GL_COMPILE_STATUS,&success) );
+			THIS_INSTANCE_CALL( InstanceErrorType::Check, glGetShaderiv(id(),GL_COMPILE_STATUS,&success) );
 			char info[512];
 			int length = 0;
 			if(!success){
-				SAFE_CALL( ShaderInfoLog, glGetShaderInfoLog(id(),512, &length, info));
+				THIS_INSTANCE_CALL( InstanceErrorType::Info, glGetShaderInfoLog(id(),512, &length, info));
 				s_last_error = std::string(info, length);
 				#ifdef GL_DEBUG
 				LOG_ERROR(Shader, "type:[" << (int)m_type << "]:" << info );
@@ -204,48 +199,49 @@ class ShaderInstance: public Instance {
 class ShaderProgramInstance: public Instance {
 	public:
 		ShaderProgramInstance():Instance(InstanceType::ShaderProgram){ 
-			SAFE_CALL( ShaderProgramCreate, *id_ref() = glCreateProgram() );
+			THIS_INSTANCE_CALL( InstanceErrorType::Create, *id_ref() = glCreateProgram() );
 		}
 
 		~ShaderProgramInstance(){
 			if(need_destroy()){
-				SAFE_CALL( ShaderProgramDelete, glDeleteProgram(id()) );
+				THIS_INSTANCE_CALL( InstanceErrorType::Destroy, glDeleteProgram(id()) );
 			}
 		}
 
 		bool attach(const ShaderInstance& shader){
-			glAttachShader(id(),shader.id());
+			THIS_INSTANCE_CALL( InstanceErrorType::Attach, glAttachShader(id(),shader.id()));
 			return !g_utils::has_error(&m_last_error);
 		}
 
 		bool operator<<(const ShaderInstance& shader){
-			glAttachShader(id(),shader.id());
+			THIS_INSTANCE_CALL( InstanceErrorType::Attach, glAttachShader(id(),shader.id()));
 			return !g_utils::has_error(&m_last_error);
 		}
 
 		bool operator<<(const std::vector<ShaderInstance>& shaders){
 			for(auto &shader: shaders){
-				glAttachShader(id(),shader.id());
+				THIS_INSTANCE_CALL( InstanceErrorType::Attach, glAttachShader(id(),shader.id()) );
 				if( g_utils::has_error(&m_last_error) )return false;
 			}
 			return true;
 		}
 
 		bool link(){
-			glLinkProgram(id());
+			THIS_INSTANCE_CALL( InstanceErrorType::Link, glLinkProgram(id()) );
 			return !g_utils::has_error(&m_last_error);
 		}
 
 		bool check_link_status(){
 			int success;
-			SAFE_CALL( ShaderProgramCheck, glGetProgramiv(id(),GL_LINK_STATUS,&success) );
+			THIS_INSTANCE_CALL( InstanceErrorType::Check, glGetProgramiv(id(),GL_LINK_STATUS,&success) );
 			char info[512];
 			int length = 0;
 			if(!success){
-				SAFE_CALL( ShaderProgramInfoLog, glGetProgramInfoLog(id(),512, &length, info) );
+				THIS_INSTANCE_CALL( InstanceErrorType::Info, glGetProgramInfoLog(id(),512, &length, info) );
 				s_last_error = std::string(info, length);
 				#ifdef GL_DEBUG
 				LOG_ERROR(Program,info);
+				//TODO: throw ShaderError
 				#endif
 			}
 			return success;
@@ -269,9 +265,9 @@ class ShaderProgramInstance: public Instance {
 		std::string s_last_error;
 
 		void t_bind() override {
-			SAFE_CALL( ShaderProgramBind, glUseProgram(id()) );
+			THIS_INSTANCE_CALL( InstanceErrorType::Bind, glUseProgram(id()) );
 		}
 		void t_unbind() override {
-			SAFE_CALL( ShaderProgramUnbind, glUseProgram(0) );
+			THIS_INSTANCE_CALL( InstanceErrorType::Unbind, glUseProgram(0) );
 		}
 };
